@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Outdoor Lights</title>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<link rel="stylesheet" href="/jquery-mobile/jquery.mobile-1.4.2.min.css">
+
+<script type="text/javascript" src="/jquery-1.11.0.min.js"></script>
+<script type="text/javascript" src="/jquery-mobile/jquery.mobile-1.4.2.min.js"></script>
+
+<script type="text/javascript">
+// Spark Core ID
+var CORE_ID = '48ff69065067555046172387';
+
+// Interval between temperature updates
+var getTempF_interval = 28000;
+
+// Interval between relay state check updates
+var getRelayStates_interval = 18000;
+
+// Timer for relay states
+var getRelayStates_timer;
+
+// jQuery mobile page init
+$(document).on('pagecreate', function() {
+	// Apply initial button states
+	$('div.ui-content[role="main"]').find('button').each(function() {
+		// Handle click event
+		$(this).click(function(e) {
+			e.preventDefault();
+			toggleRelay($(this).data('outlet'));
+		});
+		
+		// Add/remove classes to set all buttons to a red background (initially)
+		$(this)	.addClass('ui-btn')
+				.addClass('ui-corner-all')
+				.addClass('ui-btn-icon-left')
+				.removeClass('ui-btn-bg-green')
+				.addClass('ui-btn-bg-red')
+				.removeClass('ui-icon-check')
+				.addClass('ui-icon-minus');
+	});
+
+	// Get temperature
+	getTempF();
+
+	// Get relay states
+	getRelayStates();
+});
+
+
+// Function to toggle relays via Spark Cloud
+function toggleRelay(i) {
+	// Show a loading spinner
+	show_load();
+
+	// Assume we want to turn it on
+	var relayState = 'on';
+
+	// If it's already on, we will want to turn it off
+	if(isRelayOn(i)===true)
+		relayState = 'off';
+
+	// Clear the getRelayStates_timer
+	window.clearTimeout(getRelayStates_timer);
+
+	// Make the call to the Spark Cloud
+	$.post('/v1/devices/'+CORE_ID+'/toggleRelay', {'args':'relay'+i+relayState}, function(resp) {
+		// Parse the response
+		parseStates(resp.return_value);
+
+		// Restart the getRelayStates_timer
+		getRelayStates_timer = window.setTimeout(getRelayStates, getRelayStates_interval);
+
+		// Hide the loading spinner
+		hide_load();
+	});
+}
+
+
+// Function to parse the integer response from the Spark Cloud into individual relay states
+function parseStates(i) {
+	// Convert the integer into a binary string representation
+	var states = (i).toString(2);
+
+	// Pad leading 0s
+	while(states.length<4)
+		states = "0"+states;
+	
+	// Loop through the relay states
+	for(var j=0; j<4; j++)
+		// If the relay is on, make the button green
+		if(states[j]==1)
+			$('#outlet'+(j+1)).removeClass('ui-btn-bg-red').addClass('ui-btn-bg-green');
+		
+		// If the relay is off, make the button red
+		else
+			$('#outlet'+(j+1)).removeClass('ui-btn-bg-green').addClass('ui-btn-bg-red');
+
+
+	// Add minus icon to red buttons
+	$('.ui-btn-bg-red').removeClass('ui-icon-check').addClass('ui-icon-minus');
+	
+	// Add check icon to green buttons
+	$('.ui-btn-bg-green').removeClass('ui-icon-minus').addClass('ui-icon-check');
+}
+
+
+// Simple check to see if (we think) the relay is on based on whether the button is green or not
+function isRelayOn(i) {
+	return $('#outlet'+i).hasClass('ui-btn-bg-green');
+}
+
+
+// Get the temperature in fahrenheight
+function getTempF() {
+	$.get('/v1/devices/'+CORE_ID+'/tempF', function(resp) {
+		// Round to 2 decimal places and update the temperature in the footer
+		$('h4').html((Math.round(parseFloat(resp.result)*100)/100)+'&deg;F');
+		
+		// Reset the timeout to get the temperature again
+		window.setTimeout(getTempF, getTempF_interval);
+	});
+}
+
+
+// Get the relay states via the relayStates variable
+function getRelayStates() {
+	// Clear the timer
+	window.clearTimeout(getRelayStates_timer);
+	
+	$.get('/v1/devices/'+CORE_ID+'/relayStates', function(resp) {
+		// Parse the response
+		parseStates(resp.result);
+
+		// Restart the relay states timer
+		getRelayStates_timer = window.setTimeout(getRelayStates, getRelayStates_interval);
+	});
+}
+
+
+// Shortcut for $.mobile.loading.('show', ...)
+function show_load() {
+	$.mobile.loading('show', {
+		textonly: false,
+		textvisible: false,
+		msgtext: '',
+		html: ''
+	});
+}
+
+
+// Shortcut for $.mobile.loading('hide');
+function hide_load() {
+	$.mobile.loading('hide');
+}
+</script>
+
+<style type="text/css">
+.ui-btn-bg-red { background: #AA0000 !important; }
+.ui-btn-bg-green { background: #007700 !important; }
+</style>
+
+</head>
+<body>
+
+<div data-role="page" data-theme="b">
+	<!-- Header -->
+	<div data-role="header">
+		<h1>Outdoor Lights</h1>
+
+		<!-- Refresh button -->
+		<button class="ui-btn-right ui-btn ui-btn-b ui-btn-inline ui-mini ui-corner-all ui-btn-icon-right ui-icon-refresh ui-btn-icon-notext" onclick="window.location.reload()"></button>
+	</div>
+
+	<!-- Main content body -->
+	<div role="main" class="ui-content">
+
+		<!-- Relay buttons -->
+		<button id="outlet2" data-outlet="2">Deck Lights</button>
+		<button id="outlet1" data-outlet="1">Patio Rope Lights</button>
+		<button id="outlet3" data-outlet="3">Outlet 3</button>
+		<button id="outlet4" data-outlet="4">Outlet 4</button>
+
+	</div>
+
+	<!-- Footer -->
+	<div data-role="footer"><h4>...</h4></div>
+</div>
+
+</body>
+</html>
