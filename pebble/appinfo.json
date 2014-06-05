@@ -1,0 +1,22 @@
+{
+  "uuid": "1d811c40-2f75-4e26-917c-3f5528dfc27e",
+  "shortName": "Deck Lights",
+  "longName": "Deck Lights",
+  "companyName": "MunkeeSoft",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {
+    "KEY_TEMPERATURE": 0,
+    "KEY_OUTLET1": 1,
+    "KEY_OUTLET2": 2,
+    "KEY_OUTLET3": 3,
+    "KEY_OUTLET4": 4,
+    "KEY_RELAYS": 5
+  },
+  "resources": {
+    "media": []
+  }
+}
