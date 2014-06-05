@@ -16,7 +16,10 @@ static Window *window;
 static MenuLayer *menu_layer;
 static TextLayer *text_layer;
 static char buf[32] = "";
-uint8_t relay_states = 0;
+GBitmap *light_on, *light_off;
+static uint8_t relay_states = 0;
+static int temperature;
+static AppTimer *timer;
 
 // Prototypes
 static void send_spark(int key);
@@ -31,6 +34,9 @@ void menu_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *da
 void window_load(Window *window);
 void window_unload(Window *window);
 static void handle_accel_tap(AccelAxisType axis, int32_t direction);
+static void update_relay_menu();
+static void update_temperature();
+static void timer_callback(void *data);
 
 
 static void send_spark(int key) {
@@ -45,8 +51,6 @@ static void send_spark(int key) {
 
 
 static void in_recv_handler(DictionaryIterator *iter, void *ctx) {
-	text_layer_set_text(text_layer, "in_recv_handler");
-
 	Tuple *t = dict_read_first(iter);
 
 	// If it's there
@@ -61,8 +65,6 @@ static void in_recv_handler(DictionaryIterator *iter, void *ctx) {
 
 
 static void process_tuple(Tuple *t) {
-	text_layer_set_text(text_layer, "process_tuple");
-
 	int key = t->key;
 
 	int value = t->value->int32;
@@ -72,14 +74,26 @@ static void process_tuple(Tuple *t) {
 
 	switch(key) {
 		case KEY_RELAYS:
-			//snprintf(buf, 32, "Relay: %d", value);
-			//text_layer_set_text(text_layer, buf);
+			relay_states = value;
+			update_relay_menu();
 			break;
 		case KEY_TEMPERATURE:
-			snprintf(buf, sizeof("XXX \u00B0F"), "%d \u00B0F", value);
-			text_layer_set_text(text_layer, buf);
+			temperature = value;
+			update_temperature();
 			break;
 	}
+}
+
+
+static void update_relay_menu() {
+	menu_layer_reload_data(menu_layer);
+	update_temperature();
+}
+
+
+static void update_temperature() {
+	snprintf(buf, sizeof("XXX \u00B0F"), "%d \u00B0F", temperature);
+	text_layer_set_text(text_layer, buf);
 }
 
 
@@ -90,20 +104,36 @@ static uint16_t menu_get_num_rows_callback(MenuLayer *menu_layer, uint16_t secti
 
 static void menu_draw_row_callback(GContext* ctx, const Layer *cell_layer, MenuIndex *cell_index, void *data) {
 	switch(cell_index->row) {
+		// Deck Lights
 		case 0:
-			menu_cell_basic_draw(ctx, cell_layer, "Deck Lights", NULL, NULL);
+			if(bitRead(relay_states, 2)==0)
+				menu_cell_basic_draw(ctx, cell_layer, "Deck Lights", NULL, light_off);
+			else
+				menu_cell_basic_draw(ctx, cell_layer, "Deck Lights", NULL, light_on);
 			break;
 
+		// Patio Rope Lights
 		case 1:
-			menu_cell_basic_draw(ctx, cell_layer, "Patio Rope Lights", NULL, NULL);
+			if(bitRead(relay_states, 3)==0)
+				menu_cell_basic_draw(ctx, cell_layer, "Patio Rope Lights", NULL, light_off);
+			else
+				menu_cell_basic_draw(ctx, cell_layer, "Patio Rope Lights", NULL, light_on);
 			break;
 
+		// Umbrella
 		case 2:
-			menu_cell_basic_draw(ctx, cell_layer, "Umbrella", NULL, NULL);
+			if(bitRead(relay_states, 1)==0)
+				menu_cell_basic_draw(ctx, cell_layer, "Umbrella", NULL, light_off);
+			else
+				menu_cell_basic_draw(ctx, cell_layer, "Umbrella", NULL, light_on);
 			break;
 
+		// Umbrella
 		case 3:
-			menu_cell_basic_draw(ctx, cell_layer, "Extra Outlet", NULL, NULL);
+			if(bitRead(relay_states, 0)==0)
+				menu_cell_basic_draw(ctx, cell_layer, "Extra Outlet", NULL, light_off);
+			else
+				menu_cell_basic_draw(ctx, cell_layer, "Extra Outlet", NULL, light_on);
 			break;
 
 	}
@@ -112,20 +142,28 @@ static void menu_draw_row_callback(GContext* ctx, const Layer *cell_layer, MenuI
 
 void menu_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *data) {
 	switch(cell_index->row) {
+		// Deck Lights
 		case 0:
+			text_layer_set_text(text_layer, "Toggling Deck Lights . . .");
 			send_spark(KEY_OUTLET2);
 			break;
 
+		// Patio Rope Lights
 		case 1:
+			text_layer_set_text(text_layer, "Toggling Patio Rope Lights . . .");
 			send_spark(KEY_OUTLET1);
 			break;
 
+		// Umbrella
 		case 2:
-			send_spark(KEY_OUTLET4);
+			text_layer_set_text(text_layer, "Toggling Umbrella . . .");
+			send_spark(KEY_OUTLET3);
 			break;
 
+		// Extra Outlet
 		case 3:
-			send_spark(KEY_OUTLET3);
+			text_layer_set_text(text_layer, "Toggling Extra Outlet . . .");
+			send_spark(KEY_OUTLET4);
 			break;
 	}
 }
@@ -134,6 +172,13 @@ void menu_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, void *da
 static void handle_accel_tap(AccelAxisType axis, int32_t direction) {
 	text_layer_set_text(text_layer, "Updating . . .");
 	send_spark(KEY_TEMPERATURE);
+
+	timer = app_timer_register(500, timer_callback, NULL);
+}
+
+
+static void timer_callback(void *data) {
+	send_spark(KEY_RELAYS);
 }
 
 
@@ -142,6 +187,9 @@ void window_load(Window *window) {
 
 	text_layer = text_layer_create(GRect(0, 0, 144, 20));
 	text_layer_set_text_alignment(text_layer, GAlignTopLeft);
+
+	light_on = gbitmap_create_with_resource(RESOURCE_ID_LIGHT_ON);
+	light_off = gbitmap_create_with_resource(RESOURCE_ID_LIGHT_OFF);
 
 	menu_layer = menu_layer_create(GRect(0, 20, 144, 132));
 
@@ -155,7 +203,9 @@ void window_load(Window *window) {
 
 	menu_layer_set_click_config_onto_window(menu_layer, window);
 
+	text_layer_set_text(text_layer, "Updating . . .");
 	send_spark(KEY_TEMPERATURE);
+	timer = app_timer_register(500, timer_callback, NULL);
 
 	accel_tap_service_subscribe(&handle_accel_tap);
 
@@ -183,14 +233,11 @@ static void init(void) {
 	app_message_register_inbox_received((AppMessageInboxReceived) in_recv_handler);
 
 	send_spark(KEY_TEMPERATURE);
-
-	light_enable(true);
 	window_stack_push(window, false);
 }
 
 
 static void deinit(void) {
-	light_enable(false);
 	window_destroy(window);
 }
 

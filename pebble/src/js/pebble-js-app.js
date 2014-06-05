@@ -15,15 +15,13 @@ Pebble.addEventListener('ready', function(e) {
 
 
 Pebble.addEventListener('appmessage', function(dict) {
-	console.log('AppMessage received!');
-
 	if(dict.payload!=undefined) {
 		for(var i in dict.payload) {
 			console.log('Received key: '+i);
 
 			switch(i.toUpperCase()) {
 				case 'KEY_RELAYS':
-					getRelays();
+					getRelayStates();
 					break;
 
 				case 'KEY_OUTLET1':
@@ -75,7 +73,6 @@ function toggleRelay(i) {
 
 	post('/toggleRelay', 'args=relay'+i+relayState, function(resp) {
 		resp = JSON.parse(resp);
-		console.log(JSON.stringify(resp));
 
 		parseStates(resp.return_value);
 
@@ -92,7 +89,6 @@ function isRelayOn(i) {
 function getRelayStates() {
 	get('/relayStates', function(resp) {
 		resp = JSON.parse(resp);
-		console.log(JSON.stringify(resp));
 
 		parseStates(resp.result);
 
