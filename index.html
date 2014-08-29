@@ -17,6 +17,12 @@
 // Spark Core ID
 var CORE_ID = '48ff69065067555046172387';
 
+// Spark Core Access Token
+var ACCESS_TOKEN = '';
+
+// Spark Core API Url
+var API_URL = 'https://api.spark.io';
+
 // Interval between temperature updates
 var getTempF_interval = 28000;
 
@@ -70,7 +76,7 @@ function toggleRelay(i) {
 	window.clearTimeout(getRelayStates_timer);
 
 	// Make the call to the Spark Cloud
-	$.post('/v1/devices/'+CORE_ID+'/toggleRelay', {'args':'relay'+i+relayState}, function(resp) {
+	$.post(API_URL+'/v1/devices/'+CORE_ID+'/toggleRelay?access_token='+ACCESS_TOKEN, {'args':'relay'+i+relayState}, function(resp) {
 		// Parse the response
 		parseStates(resp.return_value);
 
@@ -119,7 +125,7 @@ function isRelayOn(i) {
 
 // Get the temperature in fahrenheight
 function getTempF() {
-	$.get('/v1/devices/'+CORE_ID+'/tempF', function(resp) {
+	$.get(API_URL+'/v1/devices/'+CORE_ID+'/tempF?access_token='+ACCESS_TOKEN, function(resp) {
 		// Round to 2 decimal places and update the temperature in the footer
 		$('h4').html((Math.round(parseFloat(resp.result)*100)/100)+'&deg;F');
 		
@@ -134,7 +140,7 @@ function getRelayStates() {
 	// Clear the timer
 	window.clearTimeout(getRelayStates_timer);
 	
-	$.get('/v1/devices/'+CORE_ID+'/relayStates', function(resp) {
+	$.get(API_URL+'/v1/devices/'+CORE_ID+'/relayStates?access_token='+ACCESS_TOKEN, function(resp) {
 		// Parse the response
 		parseStates(resp.result);
 
